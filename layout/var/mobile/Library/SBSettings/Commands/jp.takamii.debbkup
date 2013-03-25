@@ -1,0 +1,173 @@
+#!/bin/sh
+# DebBkup for SBSettings	Copyright(c) @takamii
+#
+#  v 0.5-1 (2013/03/17)
+#   NEW: Add Option: Upload Dropbox.
+#        Require Dropbox-Uploader(https://github.com/andreafabrizi/Dropbox-Uploader)
+#        Copy to /usr/bin/dropbox_uploader
+#
+#  v 0.4.1-1 (2011/04/21)
+#	MOD: Not respring from launchd(when execute with option "--launchd").
+#
+#  v 0.3.2-1 (2011/02/26)
+#	NEW: Add Option: Force Respring. Execute killall -9 SpringBoard.
+#	NEW: Add Debug Mode. Logging backuped FileList. Logging DebugLog.
+#	 Logfile is /var/mobile/Library/SBSettings/debbkup.log
+#
+#  v 0.3.1-1 (2011/02/20)
+#	MOD: Change command from 'cp' to 'rsync'.
+#
+#  v 0.3.0-2 (2011/02/12)
+#	NEW: Add Preference's Settings.
+#	NEW: Add Option: Respring after deb backup.
+#	NEW: Add Option: Change BackupDirectory.
+#
+#  v 0.2-1 (2010/09/01)
+#	MOD: Backup only new deb files.
+#	NEW: Add toggle icon file.
+#
+#  v 0.1-1 (2010/04/26) 
+#	First release.
+#	NEW: Backup deb file from /var/cache/opt/archives to /var/root/bkup/deb
+
+APP_NAME="debbkup"
+SRC_DIR="/var/cache/apt/archives"
+BAK_DIR="/var/root/bkup/deb"
+PREFERENCE="/var/mobile/Library/Preferences/jp.takamii.${APP_NAME}.plist"
+LOGFILE="/var/mobile/Library/SBSettings/${APP_NAME}.log"
+TEMPFILE="/tmp/${APP_NAME}.tmp"
+CYDIA="Cydia.app"
+DROPBOX_UPLOADER="/usr/bin/dropbox_uploader"
+DROPBOX_UPLOADER_RC="/var/root/.dropbox_uploader"
+DROPBOX_PATH="/deb"
+
+_NSLOG(){
+	logger -t ${APP_NAME} "$1"
+}
+
+_LOG(){
+	_NSLOG "$1"
+	if [ ${DEBUG} == 1 ]; then
+		echo "[`date '+%Y/%m/%d %T'`] $1" >>${LOGFILE}
+	fi
+}
+_DEBUGLOG(){
+	if [ ${DEBUG} == 1 ] && [ ${DEBUGLOG} == 1 ]; then
+		echo "[`date '+%Y/%m/%d %T'`] $1" >>${LOGFILE}
+	fi
+}
+read_preference(){
+	if [ -f ${PREFERENCE} ]; then
+		_NSLOG "Read Preference file."
+		ENABLE_RESPRING=`plutil -key EnableRespring ${PREFERENCE} 2> /dev/null`
+		BAK_NEW_DIR=`plutil -key BackupDir ${PREFERENCE} 2> /dev/null`
+		if [ "${BAK_NEW_DIR}" != "" ]; then
+			BAK_DIR=${BAK_NEW_DIR}
+		fi
+		ENABLE_DROPBOX=`plutil -key EnableDropbox ${PREFERENCE} 2> /dev/null`
+		DROPBOX_NEW_PATH=`plutil -key DropboxPath ${PREFERENCE} 2> /dev/null`
+		if [ "${DROPBOX_NEW_PATH}" != "" ]; then
+			DROPBOX_PATH=${DROPBOX_NEW_PATH}
+		fi
+		DEBUG=`plutil -key Debug ${PREFERENCE} 2> /dev/null`
+		DEBUGLOG=`plutil -key LoggingDebugLog ${PREFERENCE} 2> /dev/null`
+		FILELIST=`plutil -key LoggingFileList ${PREFERENCE} 2> /dev/null`
+		FORCE_RESPRING=`plutil -key ForceRespring ${PREFERENCE} 2> /dev/null`
+		_DEBUGLOG "==== START Script jp.takamii.debbkup ===="
+		_DEBUGLOG "Read Preference file."
+	else
+		_LOG "Preference file not exist."
+	fi
+}
+show_val(){
+	if [ ${DEBUG} == 1 ] && [ ${DEBUGLOG} == 1 ]; then
+		_DEBUGLOG "Values are .."
+		cat <<_EOF_ >>$LOGFILE
+			SRC_DIR = ${SRC_DIR}
+			BAK_NEW_DIR = ${BAK_NEW_DIR}
+			BAK_DIR = ${BAK_DIR}
+			ENABLE_DROPBOX = ${ENABLE_DROPBOX}
+			DROPBOX_NEW_PATH = ${DROPBOX_NEW_PATH}
+			DROPBOX_PATH = ${DROPBOX_PATH}
+			EXIST_CYDIA = ${EXIST_CYDIA}
+			ENABLE_RESPRING = ${ENABLE_RESPRING} / FORCE_RESPRING = ${FORCE_RESPRING}
+			LAUNCH_DAEMON = ${LAUNCH_DAEMON}
+			DEBUG = ${DEBUG}
+			DEBUGLOG = ${DEBUGLOG} / FILELIST = ${FILELIST}
+_EOF_
+	fi
+}
+
+#########################
+# Main routine
+#########################
+_NSLOG "==== START Script jp.takamii.debbkup ===="
+# read Preference file
+read_preference
+
+# read arguments
+if [ $# -gt 0 ] && [ $1 == "--launchd" ];then
+	ENABLE_RESPRING=0
+	_LOG "Execute from launchd."
+fi
+
+# exist Cydia.app?
+EXIST_CYDIA=`ps ax | grep ${CYDIA} | grep -v "grep ${CYDIA}" | gawk '{print $5}'`
+if [ "${EXIST_CYDIA}" != "" ]; then
+	_DEBUGLOG "Exist Cydia.app"
+fi
+
+# show_val
+
+
+# deb backup!
+if [ ! -e ${BAK_DIR} ]; then
+	_DEBUGLOG "Create Directory ${BAK_DIR}"
+	mkdir -p ${BAK_DIR}
+fi
+
+_LOG "Start backup deb files to ${BAK_DIR}"
+ls ${SRC_DIR}/*.deb >/dev/null 2>&1
+if [ $? != 0 ]; then
+	_LOG "Not exist ${SRC_DIR}/*.deb files."
+else
+	if [ ${DEBUG} == 1 ] && ( [ ${DEBUGLOG} == 1 ] || [ ${FILELIST} == 1 ] ); then
+		rsync -av ${SRC_DIR}/*.deb ${BAK_DIR} 2>>${LOGFILE} | grep ".deb" >${TEMPFILE}
+#		gawk '{print "			" $1}' <${TEMPFILE} >>${LOGFILE} 2>&1
+		gawk '{print "['"`date '+%Y/%m/%d %T'`"'] [Bkup] " $1}' <${TEMPFILE} >>${LOGFILE} 2>&1
+	else
+		rsync -av ${SRC_DIR}/*.deb ${BAK_DIR} | grep ".deb" >${TEMPFILE}
+	fi
+	_LOG "`wc -l <${TEMPFILE}` deb files backuped."
+
+	if [ ${ENABLE_DROPBOX} == 1 ]; then
+		if [ ! -e ${DROPBOX_UPLOADER} ] || [ ! -e ${DROPBOX_UPLOADER_RC} ]; then
+			_LOG "Not found ${DROPBOX_UPLOADER}, or Not setup Dropbox-Upload."
+		else
+			_LOG "Start upload to Dropbox."
+			if [ ${DEBUG} == 1 ]; then
+				gawk '{system("'${DROPBOX_UPLOADER}' upload '${BAK_DIR}'/"$1" '${DROPBOX_PATH}'/"$1)}' <${TEMPFILE} >>${LOGFILE} 2>&1
+				if [ $? != 0 ]; then
+					_LOG "Can not upload Dropbox.."
+				fi
+			else
+				gawk '{system("'${DROPBOX_UPLOADER}' upload '${BAK_DIR}'/"$1" '${DROPBOX_PATH}'/"$1)}' <${TEMPFILE}
+			fi
+		fi
+	fi
+
+	rm ${TEMPFILE}
+fi
+
+# respring!
+if [ ${ENABLE_RESPRING} == 1 ] && [ "${EXIST_CYDIA}" != "" ]; then
+	if [ ${DEBUG} == 1 ] && [ ${FORCE_RESPRING} == 1 ]; then
+		OPT_KILL="-9"
+		STR_FORCE="FORCE "
+	fi
+	_LOG "${STR_FORCE}RESPRING !"
+	killall ${OPT_KILL} SpringBoard
+fi
+
+_LOG "==== FINISH Script jp.takamii.debbkup ===="
+
