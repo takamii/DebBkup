@@ -1,0 +1,10 @@
+{
+    entry = {
+	bundle = DebBkup;
+	cell = PSLinkCell;
+	detail = DebBkupListController;
+	icon = DebBkup.png;
+	isController = 1;
+	label = DebBkup;
+    };
+}
