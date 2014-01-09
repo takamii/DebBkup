@@ -1,12 +1,12 @@
 Package: jp.takamii.debbkup
 Name: DebBkup for SBSettings
-Version: 0.5.1
+Version: 0.5.2
 Architecture: iphoneos-arm
 Description: Backup deb packages for SBSettings
 Depiction: http://repo.takamii.com/depiction/DebBkup.html
 Maintainer: takamii <takami6564+cydia@gmail.com>
 Author: takamii <takami6564+cydia@gmail.com>
 Section: SBSettings Addons
-Depends: mobilesubstrate, sbsettings, preferenceloader, rsync, gawk, com.ericasadun.utilities, inetutils
+Depends: preferenceloader, rsync, gawk, com.ericasadun.utilities, inetutils
 dev: takamii
-Icon: file:///Library/PreferenceLoader/Preferences/DebBkup/DebBkup@2x.png
+Icon: file:///Library/PreferenceBundles/DebBkup.bundle/DebBkup@2x.png
