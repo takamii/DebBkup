@@ -1,6 +1,6 @@
 Package: jp.takamii.debbkup
 Name: DebBkup for SBSettings
-Version: 0.5.2
+Version: 0.5.3
 Architecture: iphoneos-arm
 Description: Backup deb packages for SBSettings
 Depiction: http://repo.takamii.com/depiction/DebBkup.html
