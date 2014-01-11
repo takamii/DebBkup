@@ -1,3 +1,4 @@
+ARCHS = armv7 arm64
 include theos/makefiles/common.mk
 
 LIBRARY_NAME = Toggle
